@@ -171,7 +171,15 @@ class $className extends StatelessWidget {
   String routeNamesContent = '''enum RoutingNames {
   home("/"),
 
-  const RoutingNames(String route);
+  final String route;
+  const RoutingNames(this.route);
+
+  static RoutingNames? fromRoute(String? route) {
+    return RoutingNames.values.firstWhere(
+          (e) => e.route == route,
+      orElse: () => RoutingNames.splash,
+    );
+  }
 }
     ''';
 
@@ -189,7 +197,7 @@ import 'package:$projectName/core/routing/routing_names.dart';
 class AppRouter {
     static Route onGenerateRoute(RouteSettings settings){
     switch(settings.name){
-      case RoutingNames.home.route:
+      case RoutingNames.home:
         return MaterialPageRoute(builder: (_) => HomeScreen());
       default:
         return MaterialPageRoute(builder: (_) => Scaffold());
