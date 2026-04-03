@@ -76,7 +76,9 @@ class ${className}Screen extends StatelessWidget {
   print('🎉 Feature "$featureName" structure created successfully!');
 
   // Update routing_names.dart
-  File routingNamesFile = File('${featuresDir.parent.path}/core/routing/routing_names.dart');
+  File routingNamesFile = File(
+    '${featuresDir.parent.path}/core/routing/routing_names.dart',
+  );
   if (routingNamesFile.existsSync()) {
     String content = routingNamesFile.readAsStringSync();
 
@@ -98,7 +100,8 @@ class ${className}Screen extends StatelessWidget {
       entries.writeln('  $name("$route")${isLast ? ';' : ','}');
     }
 
-    String newContent = 'enum RoutingNames {\n${entries}\n  const RoutingNames(String route);\n}\n';
+    String newContent =
+        'enum RoutingNames {\n${entries}\n  const RoutingNames(String route);\n}\n';
     routingNamesFile.writeAsStringSync(newContent);
     print('✅ Updated: ${routingNamesFile.path}');
   } else {
@@ -107,11 +110,15 @@ class ${className}Screen extends StatelessWidget {
 
   // Update app_router.dart
   String projectName = projectPath.split(RegExp(r'[\\/]')).last;
-  File appRouterFile = File('${featuresDir.parent.path}/core/routing/app_router.dart');
+  File appRouterFile = File(
+    '${featuresDir.parent.path}/core/routing/app_router.dart',
+  );
   if (appRouterFile.existsSync()) {
     String content = appRouterFile.readAsStringSync();
 
-    RegExp importRegex = RegExp(r"import 'package:[^/]+/features/(\w+)/ui/\w+\.dart';");
+    RegExp importRegex = RegExp(
+      r"import 'package:[^/]+/features/(\w+)/ui/\w+\.dart';",
+    );
     List<String> existingFeatures = importRegex
         .allMatches(content)
         .map((m) => m.group(1)!)
@@ -122,17 +129,24 @@ class ${className}Screen extends StatelessWidget {
     }
 
     String imports = existingFeatures
-        .map((f) => "import 'package:$projectName/features/$f/ui/${f}_screen.dart';")
+        .map(
+          (f) =>
+              "import 'package:$projectName/features/$f/ui/${f}_screen.dart';",
+        )
         .join('\n');
 
     String cases = existingFeatures
         .map((f) {
-          String cls = f.split('_').map((w) => w[0].toUpperCase() + w.substring(1)).join();
-          return '      case RoutingNames.$f.route:\n        return MaterialPageRoute(builder: (_) => ${cls}Screen());';
+          String cls = f
+              .split('_')
+              .map((w) => w[0].toUpperCase() + w.substring(1))
+              .join();
+          return '      case RoutingNames.$f:\n        return MaterialPageRoute(builder: (_) => ${cls}Screen());';
         })
         .join('\n');
 
-    String newContent = """import 'package:flutter/material.dart';
+    String newContent =
+        """import 'package:flutter/material.dart';
 $imports
 import 'package:$projectName/core/routing/routing_names.dart';
 
