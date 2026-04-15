@@ -1,8 +1,15 @@
 import 'dart:io';
 
-void main() {
-  print('📁 Enter project path:');
-  String? projectPath = stdin.readLineSync();
+void main(List<String> args) {
+  String? projectPath;
+
+  if (args.isNotEmpty) {
+    projectPath = args[0];
+    print('📁 Project path: $projectPath');
+  } else {
+    print('📁 Enter project path:');
+    projectPath = stdin.readLineSync();
+  }
 
   if (projectPath == null || projectPath.isEmpty) {
     print('❌ Invalid path!');
@@ -101,7 +108,7 @@ class ${className}Screen extends StatelessWidget {
     }
 
     String newContent =
-        'enum RoutingNames {\n${entries}\n  const RoutingNames(String route);\n}\n';
+        'enum RoutingNames {\n${entries}\n  final String route;\n\n const RoutingNames(this.route);\n\n static RoutingNames? fromRoute(String? route) {\n    return RoutingNames.values.firstWhere((e) => e.route == route, orElse: () => RoutingNames.home);\n  }}\n';
     routingNamesFile.writeAsStringSync(newContent);
     print('✅ Updated: ${routingNamesFile.path}');
   } else {
@@ -152,7 +159,7 @@ import 'package:$projectName/core/routing/routing_names.dart';
 
 class AppRouter {
     static Route onGenerateRoute(RouteSettings settings){
-    switch(settings.name){
+    switch (RoutingNames.fromRoute(settings.name)) {
 $cases
       default:
         return MaterialPageRoute(builder: (_) => Scaffold());
