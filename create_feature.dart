@@ -23,22 +23,37 @@ void main(List<String> args) {
   }
 
   while (true) {
-    createFeature(featuresDir, projectPath);
+    bool shouldContinue = createFeature(featuresDir, projectPath);
+    if (!shouldContinue) break;
   }
 }
 
-void createFeature(Directory featuresDir, String projectPath) {
+bool createFeature(Directory featuresDir, String projectPath) {
   print('✏️  Enter feature name (e.g. home):');
   String? featureName = stdin.readLineSync();
 
   if (featureName == null || featureName.isEmpty) {
     print('❌ Invalid name!');
-    return;
+    return false;
   }
 
   if (featureName.endsWith('_screen')) {
     featureName = featureName.substring(0, featureName.length - 7);
   }
+
+  // PascalCase: on_tap -> OnTap
+  String className = featureName
+      .split('_')
+      .map((w) => w[0].toUpperCase() + w.substring(1))
+      .join();
+
+  // camelCase: on_tap -> onTap
+  List<String> parts = featureName.split('_');
+  String camelName = parts[0] +
+      parts
+          .skip(1)
+          .map((w) => w[0].toUpperCase() + w.substring(1))
+          .join();
 
   List<String> folders = [
     '$featureName/ui',
@@ -53,11 +68,6 @@ void createFeature(Directory featuresDir, String projectPath) {
     dir.createSync(recursive: true);
     print('📂 Created: ${dir.path}');
   }
-
-  String className = featureName
-      .split('_')
-      .map((w) => w[0].toUpperCase() + w.substring(1))
-      .join();
 
   File screenFile = File(
     '${featuresDir.path}/$featureName/ui/${featureName}_screen.dart',
@@ -80,96 +90,62 @@ class ${className}Screen extends StatelessWidget {
   repoFile.writeAsStringSync('class ${className}Repo {}');
   print('✅ Created: ${repoFile.path}');
 
-  print('🎉 Feature "$featureName" structure created successfully!');
+  print('🎉 Feature "$featureName" structure created successfully!\n');
 
-  // Update routing_names.dart
+  // Update routing_names.dart — append only
   File routingNamesFile = File(
     '${featuresDir.parent.path}/core/routing/routing_names.dart',
   );
   if (routingNamesFile.existsSync()) {
     String content = routingNamesFile.readAsStringSync();
 
-    RegExp entryRegex = RegExp(r'\s+(\w+)\("[^"]+"\)[,;]');
-    List<String> existing = entryRegex
-        .allMatches(content)
-        .map((m) => m.group(1)!)
-        .toList();
-
-    if (!existing.contains(featureName)) {
-      existing.add(featureName);
+    if (content.contains('$camelName(')) {
+      print('⚠️  $camelName already exists in routing_names.dart, skipping...');
+    } else {
+      // Replace the last semicolon-terminated enum entry with entry, newEntry;
+      String newEntry = '  $camelName("/$featureName")';
+      String updated = content.replaceFirstMapped(
+        RegExp(r'(\s+\w+\("[^"]+"\))\s*;'),
+        (m) => '${m.group(1)},\n$newEntry;',
+      );
+      routingNamesFile.writeAsStringSync(updated);
+      print('✅ Updated: ${routingNamesFile.path}');
     }
-
-    StringBuffer entries = StringBuffer();
-    for (int i = 0; i < existing.length; i++) {
-      String name = existing[i];
-      String route = name == 'splash' ? '/' : '/$name';
-      bool isLast = i == existing.length - 1;
-      entries.writeln('  $name("$route")${isLast ? ';' : ','}');
-    }
-
-    String newContent =
-        'enum RoutingNames {\n${entries}\n  final String route;\n\n const RoutingNames(this.route);\n\n static RoutingNames? fromRoute(String? route) {\n    return RoutingNames.values.firstWhere((e) => e.route == route, orElse: () => RoutingNames.home);\n  }}\n';
-    routingNamesFile.writeAsStringSync(newContent);
-    print('✅ Updated: ${routingNamesFile.path}');
   } else {
     print('⚠️  routing_names.dart not found, skipping...');
   }
 
-  // Update app_router.dart
+  // Update app_router.dart — append only
   String projectName = projectPath.split(RegExp(r'[\\/]')).last;
   File appRouterFile = File(
     '${featuresDir.parent.path}/core/routing/app_router.dart',
   );
   if (appRouterFile.existsSync()) {
     String content = appRouterFile.readAsStringSync();
+    String newImport =
+        "import 'package:$projectName/features/$featureName/ui/${featureName}_screen.dart';";
+    String newCase =
+        '      case RoutingNames.$camelName:\n        return MaterialPageRoute(builder: (_) => ${className}Screen());';
 
-    RegExp importRegex = RegExp(
-      r"import 'package:[^/]+/features/(\w+)/ui/\w+\.dart';",
-    );
-    List<String> existingFeatures = importRegex
-        .allMatches(content)
-        .map((m) => m.group(1)!)
-        .toList();
-
-    if (!existingFeatures.contains(featureName)) {
-      existingFeatures.add(featureName);
+    if (content.contains(newImport)) {
+      print('⚠️  $camelName already exists in app_router.dart, skipping...');
+    } else {
+      // Add import before routing_names import
+      String updated = content.replaceFirst(
+        RegExp(r"import 'package:[^']+/core/routing/routing_names\.dart';"),
+        "$newImport\nimport 'package:$projectName/core/routing/routing_names.dart';",
+      );
+      // Add case before default:
+      updated = updated.replaceFirst(
+        '      default:',
+        '$newCase\n      default:',
+      );
+      appRouterFile.writeAsStringSync(updated);
+      print('✅ Updated: ${appRouterFile.path}');
     }
-
-    String imports = existingFeatures
-        .map(
-          (f) =>
-              "import 'package:$projectName/features/$f/ui/${f}_screen.dart';",
-        )
-        .join('\n');
-
-    String cases = existingFeatures
-        .map((f) {
-          String cls = f
-              .split('_')
-              .map((w) => w[0].toUpperCase() + w.substring(1))
-              .join();
-          return '      case RoutingNames.$f:\n        return MaterialPageRoute(builder: (_) => ${cls}Screen());';
-        })
-        .join('\n');
-
-    String newContent =
-        """import 'package:flutter/material.dart';
-$imports
-import 'package:$projectName/core/routing/routing_names.dart';
-
-class AppRouter {
-    static Route onGenerateRoute(RouteSettings settings){
-    switch (RoutingNames.fromRoute(settings.name)) {
-$cases
-      default:
-        return MaterialPageRoute(builder: (_) => Scaffold());
-    }
-  }
-}""";
-
-    appRouterFile.writeAsStringSync(newContent);
-    print('✅ Updated: ${appRouterFile.path}');
   } else {
     print('⚠️  app_router.dart not found, skipping...');
   }
+
+  return true;
 }
